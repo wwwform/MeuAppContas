@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Registro de Gastos de Viagem</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <!-- SDK do OneDrive -->
+    <script type="text/javascript" src="https://js.live.net/v7.2/OneDrive.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Formulário Inicial -->
+        <form id="formIdentificacao">
+            <h1>✈️ Controle de Gastos de Viagem</h1>
+            <div class="input-group">
+                <label for="nome">Nome do Viajante:</label>
+                <input type="text" id="nome" required placeholder="Ex: João Silva">
+            </div>
+            <div class="input-group">
+                <label>Período da Viagem:</label>
+                <div class="date-range">
+                    <input type="date" id="dataInicio" required>
+                    <span>até</span>
+                    <input type="date" id="dataFim" required>
+                </div>
+            </div>
+            <button type="submit" class="btn-primary">▶️ Iniciar Registro</button>
+        </form>
+
+        <!-- Área de Registro de Gastos -->
+        <div id="areaFotos" style="display:none;">
+            <h2>📷 Registrar Comprovantes</h2>
+            <div class="upload-controls">
+                <div class="input-group">
+                    <label for="dataRegistro">Data do Gasto:</label>
+                    <input type="date" id="dataRegistro" required min="" max="">
+                </div>
+                <div class="input-group">
+                    <label for="legenda">Categoria:</label>
+                    <select id="legenda">
+                        <option value="Café">☕ Café da Manhã</option>
+                        <option value="Almoço">🍴 Almoço</option>
+                        <option value="Jantar">🌙 Jantar</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="valorGasto">Valor (R$):</label>
+                    <input type="number" id="valorGasto" step="0.01" min="0" placeholder="0,00" required>
+                </div>
+                <div class="input-group">
+                    <label for="inputFoto">Foto do comprovante:</label>
+                    <input type="file" accept="image/*" capture="environment" id="inputFoto" multiple>
+                </div>
+                <button id="adicionarFotoBtn" class="btn-secondary" type="button">
+                    ➕ Adicionar à Lista
+                </button>
+            </div>
+
+            <!-- Pré-visualização -->
+            <div id="listaFotos" class="photo-grid"></div>
+
+            <!-- Totais das categorias -->
+            <div class="totais-container">
+                <p>Total Café da Manhã: <span id="totalCafe">R$ 0,00</span></p>
+                <p>Total Almoço: <span id="totalAlmoco">R$ 0,00</span></p>
+                <p>Total Jantar: <span id="totalJanta">R$ 0,00</span></p>
+                <p><strong>Total Geral: <span id="totalGeral">R$ 0,00</span></strong></p>
+            </div>
+
+            <!-- Controles Finais -->
+            <button id="enviarOneDriveBtn" class="btn-primary" type="button">
+                ☁️ Salvar no OneDrive
+            </button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
