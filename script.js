@@ -1,121 +1,156 @@
-// Armazena os dados das fotos
 let fotos = [];
 let dadosUsuario = {};
 
-// Evento de envio do formulário inicial
-document.getElementById('formIdentificacao').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    // Coletar dados do formulário
-    dadosUsuario = {
-        nome: document.getElementById('nome').value,
-        dataInicio: document.getElementById('dataInicio').value,
-        dataFim: document.getElementById('dataFim').value
-    };
-
-    // Mostrar área de fotos
-    document.getElementById('formIdentificacao').style.display = 'none';
-    document.getElementById('areaFotos').style.display = 'block';
-});
-
-// Função para formatar data no padrão dd/mm/aaaa
-function formatarData(inputDate) {
-    const date = new Date(inputDate);
-    const dia = String(date.getDate()).padStart(2, '0');
-    const mes = String(date.getMonth() + 1).padStart(2, '0');
-    const ano = date.getFullYear();
+// =============== FUNÇÕES ESSENCIAIS ===============
+function formatarData(dataISO) {
+    const [ano, mes, dia] = dataISO.split('-');
     return `${dia}/${mes}/${ano}`;
 }
 
-// Modificação no evento de adicionar foto
-document.getElementById('adicionarFotoBtn').addEventListener('click', function() {
-    const dataRegistro = document.getElementById('dataRegistro').value;
-    
-    if (!dataRegistro) {
-        alert('Selecione a data do gasto!');
-        return;
-    }
+function formatarMoeda(valor) {
+    return new Intl.NumberFormat('pt-BR', { 
+        style: 'currency', 
+        currency: 'BRL' 
+    }).format(valor);
+}
 
-    const input = document.getElementById('inputFoto');
-    const files = input.files;
-    
-    if (files.length > 0) {
-        Array.from(files).forEach(file => {
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                const fotoData = {
-                    arquivo: file,
-                    preview: e.target.result,
-                    categoria: document.getElementById('legenda').value,
-                    data: document.getElementById('dataRegistro').value,
-                    nomeArquivo: `${dadosUsuario.nome.replace(/\s/g, '_')}_${
-                        formatarData(document.getElementById('dataRegistro').value).replace(/\//g, '-')
-                    }_${Date.now()}.${file.name.split('.').pop()}`
-                };
+function atualizarTotais() {
+    let totais = {
+        cafe: 0,
+        almoco: 0,
+        jantar: 0,
+        geral: 0
+    };
 
-                fotos.push(fotoData);
-                atualizarListaFotos();
-            };
-            
-            reader.readAsDataURL(file);
-        });
-    }
-});
+    fotos.forEach(foto => {
+        const valor = parseFloat(foto.valor);
+        switch(foto.categoria) {
+            case 'Café': totais.cafe += valor; break;
+            case 'Almoço': totais.almoco += valor; break;
+            case 'Jantar': totais.jantar += valor; break;
+        }
+        totais.geral += valor;
+    });
 
+    document.getElementById('totalCafe').textContent = formatarMoeda(totais.cafe);
+    document.getElementById('totalAlmoco').textContent = formatarMoeda(totais.almoco);
+    document.getElementById('totalJanta').textContent = formatarMoeda(totais.jantar);
+    document.getElementById('totalGeral').textContent = formatarMoeda(totais.geral);
+}
 
-// Atualiza a pré-visualização das fotos
-function atualizarListaFotos() {
+function atualizarPreview() {
     const container = document.getElementById('listaFotos');
     container.innerHTML = '';
-    
-    fotos.forEach((foto, index) => {
+
+    fotos.forEach(foto => {
         const div = document.createElement('div');
         div.className = 'photo-preview';
         div.innerHTML = `
-            <img src="${foto.preview}" alt="Preview">
+            <img src="${foto.preview}" alt="Comprovante">
             <div class="photo-info">
-                <small>${foto.categoria} - ${foto.data}</small>
+                ${foto.categoria} - ${formatarData(foto.data)}<br>
+                ${formatarMoeda(foto.valor)}
             </div>
         `;
         container.appendChild(div);
     });
 }
 
-// Upload para o OneDrive (Implementação básica)
-document.getElementById('enviarOneDriveBtn').addEventListener('click', async function() {
+// =============== EVENTOS PRINCIPAIS ===============
+document.getElementById('formIdentificacao').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    dadosUsuario = {
+        nome: document.getElementById('nome').value.trim(),
+        dataInicio: document.getElementById('dataInicio').value,
+        dataFim: document.getElementById('dataFim').value
+    };
+
+    document.getElementById('formIdentificacao').style.display = 'none';
+    document.getElementById('areaFotos').style.display = 'block';
+});
+
+document.getElementById('adicionarFotoBtn').addEventListener('click', function() {
+    const files = document.getElementById('inputFoto').files;
+    const valor = document.getElementById('valorGasto').value;
+    const data = document.getElementById('dataRegistro').value;
+
+    if (!data || !valor || files.length === 0) {
+        alert('Preencha todos os campos!');
+        return;
+    }
+
+    Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            fotos.push({
+                arquivo: file,
+                preview: e.target.result,
+                categoria: document.getElementById('legenda').value,
+                data: data,
+                valor: valor,
+                nomeArquivo: `${dadosUsuario.nome.replace(/ /g, '_')}_${formatarData(data).replace(/\//g, '-')}_${Date.now()}.${file.name.split('.').pop()}`
+            });
+            atualizarPreview();
+            atualizarTotais();
+        };
+        reader.readAsDataURL(file);
+    });
+
+    document.getElementById('inputFoto').value = '';
+    document.getElementById('valorGasto').value = '';
+});
+
+// =============== ONEDRIVE (FUNCIONAL) ===============
+document.getElementById('enviarOneDriveBtn').addEventListener('click', async () => {
+    if (fotos.length === 0) {
+        alert('Adicione comprovantes primeiro!');
+        return;
+    }
+
+    // Autenticação
+    const clientId = 'SEU_CLIENT_ID_AQUI'; // ← Obtenha no portal Azure
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(window.location.href)}`;
+    
+    // Abre popup de autenticação
+    const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
+    
+    // Captura token
+    window.addEventListener('message', e => {
+        if (e.origin === window.location.origin && e.data.access_token) {
+            enviarArquivos(e.data.access_token);
+            authWindow.close();
+        }
+    });
+});
+
+async function enviarArquivos(token) {
     try {
-        // Autenticação no Microsoft Graph (substitua com suas credenciais)
-        const clientId = 'SEU_CLIENT_ID_AQUI';
-        const redirectUri = 'http://localhost:5500'; // Altere para seu domínio
-        
-        // Iniciar fluxo OAuth
-        const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=token&redirect_uri=${redirectUri}&scope=Files.ReadWrite`;
-        
-        // Redirecionar para autenticação
-        window.location.href = authUrl;
-        
-        // Após autenticação bem-sucedida (implementar lógica de callback)
-        // Upload de cada arquivo
         for (const foto of fotos) {
             const formData = new FormData();
             formData.append('file', foto.arquivo, foto.nomeArquivo);
             
-            // Requisição para a API do OneDrive
-            await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/Expenses/' + foto.nomeArquivo + ':/content', {
+            await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/Expenses/${foto.nomeArquivo}:/content`, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': 'Bearer ' + accessToken
+                    'Authorization': `Bearer ${token}`
                 },
                 body: formData
             });
         }
-        
         alert('Arquivos enviados com sucesso!');
         fotos = [];
-        atualizarListaFotos();
+        atualizarPreview();
+        atualizarTotais();
     } catch (error) {
-        console.error('Erro no upload:', error);
-        alert('Erro ao enviar arquivos!');
+        alert('Erro: ' + error.message);
     }
-});
+}
+
+// Captura token após autenticação
+if (window.location.hash.includes('access_token')) {
+    const params = new URLSearchParams(window.location.hash.substr(1));
+    const token = params.get('access_token');
+    window.opener.postMessage({ access_token: token }, window.location.origin);
+    window.close();
+}
