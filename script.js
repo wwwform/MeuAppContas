@@ -109,7 +109,7 @@ document.getElementById('enviarOneDriveBtn').addEventListener('click', async () 
     }
 
     // Autenticação
-    const clientId = 'SEU_CLIENT_ID_AQUI'; // ← Obtenha no portal Azure
+    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // ← Obtenha no portal Azure
     const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(window.location.href)}`;
     
     // Abre popup de autenticação
