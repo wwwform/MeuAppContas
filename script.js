@@ -142,7 +142,7 @@ document.getElementById('enviarOneDriveBtn').addEventListener('click', function(
     }
 
     // IMPORTANTE: Substitua pelo seu clientId do app registrado no portal Microsoft
-    const clientId = 'SEU_CLIENT_ID_AQUI';
+    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121';
 
     // Envia os arquivos um a um para o OneDrive usando o SDK
     fotos.forEach((foto, idx) => {
