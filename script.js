@@ -122,7 +122,7 @@ document.getElementById('enviarOneDriveBtn').addEventListener('click', async () 
     }
 
     // --- CONFIGURAÇÕES ---
-    const clientId = 'SEU_CLIENT_ID_AQUI'; // <-- Substitua pelo seu Client ID do Azure
+    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // <-- Substitua pelo seu Client ID do Azure
     const redirectUri = window.location.origin; // Ex: http://localhost:5500
     const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&scope=Files.ReadWrite%20User.Read&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
