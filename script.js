@@ -1,8 +1,9 @@
 let fotos = [];
 let dadosUsuario = {};
 
-// =============== FUNÇÕES ESSENCIAIS ===============
+// =============== FUNÇÕES AUXILIARES ===============
 function formatarData(dataISO) {
+    if (!dataISO) return '';
     const [ano, mes, dia] = dataISO.split('-');
     return `${dia}/${mes}/${ano}`;
 }
@@ -66,6 +67,18 @@ document.getElementById('formIdentificacao').addEventListener('submit', function
         dataFim: document.getElementById('dataFim').value
     };
 
+    // Ajusta limites do campo de data de registro
+    const dataRegistro = document.getElementById('dataRegistro');
+    dataRegistro.min = dadosUsuario.dataInicio;
+    dataRegistro.max = dadosUsuario.dataFim;
+    // Define data padrão como hoje (se estiver no período)
+    const hoje = new Date().toISOString().split('T')[0];
+    if (hoje >= dadosUsuario.dataInicio && hoje <= dadosUsuario.dataFim) {
+        dataRegistro.value = hoje;
+    } else {
+        dataRegistro.value = dadosUsuario.dataInicio;
+    }
+
     document.getElementById('formIdentificacao').style.display = 'none';
     document.getElementById('areaFotos').style.display = 'block';
 });
@@ -101,41 +114,41 @@ document.getElementById('adicionarFotoBtn').addEventListener('click', function()
     document.getElementById('valorGasto').value = '';
 });
 
-// =============== ONEDRIVE (FUNCIONAL) ===============
+// =============== ONEDRIVE (MICROSOFT GRAPH API) ===============
 document.getElementById('enviarOneDriveBtn').addEventListener('click', async () => {
     if (fotos.length === 0) {
         alert('Adicione comprovantes primeiro!');
         return;
     }
 
-    // Autenticação
-    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // ← Obtenha no portal Azure
-    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(window.location.href)}`;
-    
-    // Abre popup de autenticação
+    // --- CONFIGURAÇÕES ---
+    const clientId = 'SEU_CLIENT_ID_AQUI'; // <-- Substitua pelo seu Client ID do Azure
+    const redirectUri = window.location.origin; // Ex: http://localhost:5500
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&scope=Files.ReadWrite%20User.Read&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+    // --- AUTENTICAÇÃO ---
     const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
-    
-    // Captura token
-    window.addEventListener('message', e => {
+
+    // Aguarda token
+    window.addEventListener('message', function handler(e) {
         if (e.origin === window.location.origin && e.data.access_token) {
+            window.removeEventListener('message', handler);
             enviarArquivos(e.data.access_token);
             authWindow.close();
         }
     });
 });
 
+// Função de envio dos arquivos para o OneDrive
 async function enviarArquivos(token) {
     try {
         for (const foto of fotos) {
-            const formData = new FormData();
-            formData.append('file', foto.arquivo, foto.nomeArquivo);
-            
             await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/Expenses/${foto.nomeArquivo}:/content`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`
                 },
-                body: formData
+                body: foto.arquivo
             });
         }
         alert('Arquivos enviados com sucesso!');
@@ -143,14 +156,16 @@ async function enviarArquivos(token) {
         atualizarPreview();
         atualizarTotais();
     } catch (error) {
-        alert('Erro: ' + error.message);
+        alert('Erro ao enviar arquivos: ' + error.message);
     }
 }
 
-// Captura token após autenticação
+// Captura token após autenticação (callback)
 if (window.location.hash.includes('access_token')) {
     const params = new URLSearchParams(window.location.hash.substr(1));
     const token = params.get('access_token');
-    window.opener.postMessage({ access_token: token }, window.location.origin);
-    window.close();
+    if (token && window.opener) {
+        window.opener.postMessage({ access_token: token }, window.location.origin);
+        window.close();
+    }
 }
