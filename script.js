@@ -198,7 +198,7 @@ document.getElementById('enviarOneDriveBtn').addEventListener('click', async () 
         return;
     }
 
-    const clientId = 'SEU_CLIENT_ID_AQUI'; // Substitua pelo seu Client ID do Azure
+    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // Substitua pelo seu Client ID do Azure
     const redirectUri = 'https://meuappcontas.netlify.app/'; // Substitua pelo seu domínio exato
 
     const authUrl = `https://login.live.com/oauth20_authorize.srf?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
