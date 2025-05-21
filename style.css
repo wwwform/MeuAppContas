@@ -1,15 +1,12 @@
-/* Reset básico */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
 body {
-    background: #f0f2f5;
-    color: #1a1a1a;
-    line-height: 1.6;
+    background: #f0f8ff;
     padding: 20px;
 }
 
@@ -19,13 +16,13 @@ body {
     background: white;
     padding: 30px;
     border-radius: 15px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
 h1, h2 {
-    color: #2c3e50;
-    margin-bottom: 25px;
+    color: #1e88e5;
     text-align: center;
+    margin-bottom: 25px;
 }
 
 .input-group {
@@ -35,30 +32,32 @@ h1, h2 {
 label {
     display: block;
     margin-bottom: 8px;
+    color: #2c3e50;
     font-weight: 600;
-    color: #34495e;
 }
 
 input[type="text"],
 input[type="date"],
+input[type="number"],
 select {
     width: 100%;
     padding: 12px;
-    border: 2px solid #bdc3c7;
+    border: 2px solid #90caf9;
     border-radius: 8px;
     font-size: 16px;
-    transition: border-color 0.3s;
+    transition: all 0.3s ease;
 }
 
 input:focus, select:focus {
-    border-color: #3498db;
+    border-color: #1e88e5;
+    box-shadow: 0 0 8px rgba(30,136,229,0.3);
     outline: none;
 }
 
 .date-range {
     display: flex;
-    align-items: center;
     gap: 10px;
+    align-items: center;
 }
 
 .photo-grid {
@@ -73,6 +72,11 @@ input:focus, select:focus {
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+.photo-preview:hover {
+    transform: translateY(-3px);
 }
 
 .photo-preview img {
@@ -81,32 +85,69 @@ input:focus, select:focus {
     object-fit: cover;
 }
 
-.btn-primary {
-    background: #3498db;
+.photo-info {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    padding: 8px;
+    background: rgba(0,0,0,0.7);
     color: white;
-    padding: 12px 25px;
+    font-size: 0.9em;
+}
+
+.btn-primary {
+    background: #1e88e5;
+    color: white;
+    padding: 14px 28px;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     font-size: 16px;
-    transition: transform 0.2s, background 0.3s;
+    transition: all 0.3s ease;
     width: 100%;
 }
 
 .btn-primary:hover {
-    background: #2980b9;
-    transform: translateY(-2px);
+    background: #1565b9;
+    transform: scale(1.02);
 }
 
 .btn-secondary {
-    background: #2ecc71;
+    background: #43a047;
     color: white;
     padding: 10px 20px;
     border: none;
     border-radius: 6px;
     cursor: pointer;
+    transition: background 0.3s;
 }
 
-.hidden {
-    display: none;
+.btn-secondary:hover {
+    background: #388e3c;
+}
+
+.totais-container {
+    background: #e3f2fd;
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 25px;
+}
+
+.totais-container p {
+    margin: 10px 0;
+    font-size: 16px;
+    color: #1a237e;
+}
+
+.total-geral {
+    border-top: 2px solid #1e88e5;
+    padding-top: 15px;
+    margin-top: 15px;
+    font-size: 18px;
+}
+
+/* Estilo para a nova categoria */
+option[value="Lavanderia"] {
+    background: #e8f5e9;
+    color: #2e7d32;
 }
