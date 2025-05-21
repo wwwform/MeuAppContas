@@ -5,43 +5,55 @@ let dadosUsuario = {};
 function formatarData(dataISO) {
     if (!dataISO) return '';
     const [ano, mes, dia] = dataISO.split('-');
-    return `${dia}/${mes}/${ano}`;
+    return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${ano}`;
 }
 
 function formatarMoeda(valor) {
-    return new Intl.NumberFormat('pt-BR', { 
-        style: 'currency', 
-        currency: 'BRL' 
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
     }).format(valor || 0);
 }
 
 function atualizarTotais() {
-    let totais = { cafe: 0, almoco: 0, jantar: 0, geral: 0 };
+    let totais = {
+        cafe: 0,
+        almoco: 0,
+        jantar: 0,
+        lavanderia: 0,
+        geral: 0
+    };
+
     fotos.forEach(foto => {
         const valor = parseFloat(foto.valor);
         switch(foto.categoria) {
             case 'Café': totais.cafe += valor; break;
             case 'Almoço': totais.almoco += valor; break;
             case 'Jantar': totais.jantar += valor; break;
+            case 'Lavanderia': totais.lavanderia += valor; break;
         }
         totais.geral += valor;
     });
+
     document.getElementById('totalCafe').textContent = formatarMoeda(totais.cafe);
     document.getElementById('totalAlmoco').textContent = formatarMoeda(totais.almoco);
     document.getElementById('totalJanta').textContent = formatarMoeda(totais.jantar);
+    document.getElementById('totalLavanderia').textContent = formatarMoeda(totais.lavanderia);
     document.getElementById('totalGeral').textContent = formatarMoeda(totais.geral);
 }
 
 function atualizarPreview() {
     const container = document.getElementById('listaFotos');
     container.innerHTML = '';
+
     fotos.forEach(foto => {
         const div = document.createElement('div');
         div.className = 'photo-preview';
         div.innerHTML = `
             <img src="${foto.preview}" alt="Comprovante">
             <div class="photo-info">
-                ${foto.categoria} - ${formatarData(foto.data)}<br>
+                ${foto.categoria}<br>
+                ${formatarData(foto.data)}<br>
                 ${formatarMoeda(foto.valor)}
             </div>
         `;
@@ -49,28 +61,7 @@ function atualizarPreview() {
     });
 }
 
-// =============== INICIALIZAÇÃO ===============
-document.addEventListener('DOMContentLoaded', () => {
-    // Carrega dados do localStorage
-    const dadosSalvos = localStorage.getItem('dadosUsuario');
-    if (dadosSalvos) {
-        dadosUsuario = JSON.parse(dadosSalvos);
-        exibirResumoUsuario();
-    }
-});
-
-function exibirResumoUsuario() {
-    const resumo = document.createElement('div');
-    resumo.className = 'resumo-usuario';
-    resumo.innerHTML = `
-        <h3>📋 Resumo da Viagem</h3>
-        <p><strong>Viajante:</strong> ${dadosUsuario.nome}</p>
-        <p><strong>Período:</strong> ${formatarData(dadosUsuario.dataInicio)} a ${formatarData(dadosUsuario.dataFim)}</p>
-    `;
-    document.body.insertBefore(resumo, document.querySelector('.container'));
-}
-
-// =============== FORMULÁRIO INICIAL ===============
+// =============== EVENTOS PRINCIPAIS ===============
 document.getElementById('formIdentificacao').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -80,11 +71,7 @@ document.getElementById('formIdentificacao').addEventListener('submit', function
         dataFim: document.getElementById('dataFim').value
     };
 
-    // Salva no localStorage e exibe resumo
-    localStorage.setItem('dadosUsuario', JSON.stringify(dadosUsuario));
-    exibirResumoUsuario();
-    
-    // Configura datas
+    // Configurar datas
     const dataRegistro = document.getElementById('dataRegistro');
     dataRegistro.min = dadosUsuario.dataInicio;
     dataRegistro.max = dadosUsuario.dataFim;
@@ -94,7 +81,6 @@ document.getElementById('formIdentificacao').addEventListener('submit', function
     document.getElementById('areaFotos').style.display = 'block';
 });
 
-// =============== ADICIONAR FOTOS ===============
 document.getElementById('adicionarFotoBtn').addEventListener('click', function() {
     const files = document.getElementById('inputFoto').files;
     const valor = document.getElementById('valorGasto').value;
@@ -126,61 +112,55 @@ document.getElementById('adicionarFotoBtn').addEventListener('click', function()
     document.getElementById('valorGasto').value = '';
 });
 
-// =============== ONEDRIVE (PERSISTÊNCIA MULTIDISPOSITIVO) ===============
+// =============== INTEGRAÇÃO ONEDRIVE ===============
 document.getElementById('enviarOneDriveBtn').addEventListener('click', async () => {
     if (fotos.length === 0) {
         alert('Adicione comprovantes primeiro!');
         return;
     }
 
-    // 1. Autenticação
-    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // Seu Client ID
-    const redirectUri = 'https://meuappcontas.netlify.app/'; // Altere para seu domínio
-    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    // Configurações
+    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // ← Obtenha no portal Azure
+    const redirectUri = encodeURIComponent(window.location.origin);
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${redirectUri}`;
+
+    // Autenticação
     const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
 
-    // 2. Salva dados do usuário no OneDrive após autenticação
-    window.addEventListener('message', async e => {
+    // Captura token
+    window.addEventListener('message', async (e) => {
         if (e.origin === window.location.origin && e.data.access_token) {
             const accessToken = e.data.access_token;
             
-            // Envia comprovantes
+            // Cria pasta com nome do usuário e data
+            const pasta = `${dadosUsuario.nome}_${formatarData(dadosUsuario.dataInicio).replace(/\//g, '-')}`;
+            
+            // Envia arquivos
             for (const foto of fotos) {
                 const formData = new FormData();
                 formData.append('file', foto.arquivo, foto.nomeArquivo);
-                await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/Expenses/${foto.nomeArquivo}:/content`, {
+                await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${pasta}/${foto.nomeArquivo}:/content`, {
                     method: 'PUT',
                     headers: { 'Authorization': `Bearer ${accessToken}` },
                     body: formData
                 });
             }
 
-            // Salva dados do usuário em arquivo JSON no OneDrive
-            const userDataFile = new Blob([JSON.stringify(dadosUsuario)], { type: 'application/json' });
-            await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/Expenses/user_data.json:/content`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${accessToken}` },
-                body: userDataFile
-            });
-
-            alert('Dados salvos com sucesso no OneDrive!');
+            alert('Arquivos salvos na pasta: ' + pasta);
             authWindow.close();
+            fotos = [];
+            atualizarPreview();
+            atualizarTotais();
         }
     });
 });
 
-// 3. Carrega dados do usuário do OneDrive ao logar
+// Captura token após autenticação
 if (window.location.hash.includes('access_token')) {
     const params = new URLSearchParams(window.location.hash.substr(1));
     const token = params.get('access_token');
-    
-    fetch('https://graph.microsoft.com/v1.0/me/drive/root:/Expenses/user_data.json:/content', {
-        headers: { 'Authorization': `Bearer ${token}` }
-    })
-    .then(response => response.json())
-    .then(data => {
-        localStorage.setItem('dadosUsuario', JSON.stringify(data));
+    if (token && window.opener) {
         window.opener.postMessage({ access_token: token }, window.location.origin);
         window.close();
-    });
+    }
 }
