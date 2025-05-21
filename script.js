@@ -121,10 +121,10 @@ document.getElementById('enviarOneDriveBtn').addEventListener('click', async () 
         return;
     }
 
-    // --- CONFIGURAÇÕES ---
-    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // <-- Substitua pelo seu Client ID do Azure
-    const redirectUri = window.location.origin; // Ex: http://localhost:5500
-    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&scope=Files.ReadWrite%20User.Read&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    // --- CONFIGURAÇÕES FIXAS ---
+    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // Seu Client ID
+    const redirectUri = 'http://localhost:5500'; // ← Fixo, igual ao registrado no Azure
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
     // --- AUTENTICAÇÃO ---
     const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
