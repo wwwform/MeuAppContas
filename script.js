@@ -64,7 +64,7 @@ function atualizarPreview() {
 // =============== EVENTOS PRINCIPAIS ===============
 document.getElementById('formIdentificacao').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     dadosUsuario = {
         nome: document.getElementById('nome').value.trim(),
         dataInicio: document.getElementById('dataInicio').value,
@@ -119,44 +119,70 @@ document.getElementById('enviarOneDriveBtn').addEventListener('click', async () 
         return;
     }
 
-    // CONFIGURAÇÕES ONEDRIVE - PARTE CRÍTICA
-    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121';
-    // Redirect URI deve ser EXATAMENTE igual ao registrado no Azure
-    const redirectUri = 'https://meuappcontas.netlify.app/';
-    
-    // URL de autenticação correta
+    // CONFIGURAÇÕES ONEDRIVE
+    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // Substitua pelo seu Client ID do Azure
+    const redirectUri = 'https://meuappcontas.netlify.app'; // Substitua pelo seu domínio exato, SEM barra final se não houver no Azure
+
     const authUrl = `https://login.live.com/oauth20_authorize.srf?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
     // Abre janela de autenticação
     const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
 
     // Aguarda token
-    window.addEventListener('message', async (e) => {
+    window.addEventListener('message', async function handler(e) {
         if (e.origin === window.location.origin && e.data.access_token) {
+            window.removeEventListener('message', handler);
             const accessToken = e.data.access_token;
-            
-            // Cria pasta com nome do usuário e data
-            const pasta = `${dadosUsuario.nome}_${formatarData(dadosUsuario.dataInicio).replace(/\//g, '-')}`;
-            
+
             try {
-                // Envia arquivos
-                for (const foto of fotos) {
-                    const formData = new FormData();
-                    formData.append('file', foto.arquivo, foto.nomeArquivo);
-                    await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${pasta}/${foto.nomeArquivo}:/content`, {
-                        method: 'PUT',
-                        headers: { 'Authorization': `Bearer ${accessToken}` },
-                        body: formData
-                    });
+                // Nome da pasta a ser criada
+                const pasta = `${dadosUsuario.nome}_${formatarData(dadosUsuario.dataInicio).replace(/\//g, '-')}`;
+
+                // PASSO 1: Criar a pasta
+                const folderData = {
+                    "name": pasta,
+                    "folder": {},
+                    "@microsoft.graph.conflictBehavior": "rename"
+                };
+
+                const createFolderResponse = await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(folderData)
+                });
+
+                if (!createFolderResponse.ok) {
+                    throw new Error(`Erro ao criar pasta: ${createFolderResponse.status} ${createFolderResponse.statusText}`);
                 }
 
-                alert('Arquivos salvos na pasta: ' + pasta);
+                const folderInfo = await createFolderResponse.json();
+                const folderId = folderInfo.id;
+
+                // PASSO 2: Fazer upload dos arquivos para a pasta criada
+                for (const foto of fotos) {
+                    const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${folderId}:/${foto.nomeArquivo}:/content`, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `Bearer ${accessToken}` },
+                        body: foto.arquivo
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Erro ao enviar arquivo ${foto.nomeArquivo}`);
+                    }
+                }
+
+                alert(`Arquivos salvos com sucesso na pasta "${pasta}"! Verifique seu OneDrive.`);
+                window.open('https://onedrive.live.com/', '_blank');
                 authWindow.close();
                 fotos = [];
                 atualizarPreview();
                 atualizarTotais();
             } catch (error) {
                 alert('Erro ao salvar arquivos: ' + error.message);
+                console.error('Erro completo:', error);
             }
         }
     });
