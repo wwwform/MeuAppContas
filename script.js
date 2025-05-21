@@ -119,15 +119,18 @@ document.getElementById('enviarOneDriveBtn').addEventListener('click', async () 
         return;
     }
 
-    // Configurações
-    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // ← Obtenha no portal Azure
-    const redirectUri = encodeURIComponent(window.location.origin);
-    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${redirectUri}`;
+    // CONFIGURAÇÕES ONEDRIVE - PARTE CRÍTICA
+    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121';
+    // Redirect URI deve ser EXATAMENTE igual ao registrado no Azure
+    const redirectUri = 'https://meuappcontas.netlify.app/';
+    
+    // URL de autenticação correta
+    const authUrl = `https://login.live.com/oauth20_authorize.srf?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-    // Autenticação
+    // Abre janela de autenticação
     const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
 
-    // Captura token
+    // Aguarda token
     window.addEventListener('message', async (e) => {
         if (e.origin === window.location.origin && e.data.access_token) {
             const accessToken = e.data.access_token;
@@ -135,22 +138,26 @@ document.getElementById('enviarOneDriveBtn').addEventListener('click', async () 
             // Cria pasta com nome do usuário e data
             const pasta = `${dadosUsuario.nome}_${formatarData(dadosUsuario.dataInicio).replace(/\//g, '-')}`;
             
-            // Envia arquivos
-            for (const foto of fotos) {
-                const formData = new FormData();
-                formData.append('file', foto.arquivo, foto.nomeArquivo);
-                await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${pasta}/${foto.nomeArquivo}:/content`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${accessToken}` },
-                    body: formData
-                });
-            }
+            try {
+                // Envia arquivos
+                for (const foto of fotos) {
+                    const formData = new FormData();
+                    formData.append('file', foto.arquivo, foto.nomeArquivo);
+                    await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${pasta}/${foto.nomeArquivo}:/content`, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `Bearer ${accessToken}` },
+                        body: formData
+                    });
+                }
 
-            alert('Arquivos salvos na pasta: ' + pasta);
-            authWindow.close();
-            fotos = [];
-            atualizarPreview();
-            atualizarTotais();
+                alert('Arquivos salvos na pasta: ' + pasta);
+                authWindow.close();
+                fotos = [];
+                atualizarPreview();
+                atualizarTotais();
+            } catch (error) {
+                alert('Erro ao salvar arquivos: ' + error.message);
+            }
         }
     });
 });
