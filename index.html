@@ -26,8 +26,8 @@
                 </div>
             </div>
             <div class="input-group">
-                <label for="valorDisponivel">Valor Disponível para Gastos (R$):</label>
-                <input type="number" id="valorDisponivel" step="0.01" min="0" placeholder="0,00" required>
+                <label for="valorDisponivel">Valor Disponível (R$):</label>
+                <input type="number" id="valorDisponivel" step="0.01" min="0" required>
             </div>
             <button type="submit" class="btn-primary">▶️ Iniciar Registro</button>
         </form>
@@ -49,7 +49,7 @@
                 <div class="input-group">
                     <label for="legenda">Categoria:</label>
                     <select id="legenda">
-                        <option value="Café">☕ Café da Manhã</option>
+                        <option value="Café">☕ Café</option>
                         <option value="Almoço">🍴 Almoço</option>
                         <option value="Jantar">🌙 Jantar</option>
                         <option value="Lavanderia">🧺 Lavanderia</option>
@@ -57,15 +57,13 @@
                 </div>
                 <div class="input-group">
                     <label for="valorGasto">Valor (R$):</label>
-                    <input type="number" id="valorGasto" step="0.01" min="0" placeholder="0,00" required>
+                    <input type="number" id="valorGasto" step="0.01" min="0" required>
                 </div>
                 <div class="input-group">
                     <label for="inputFoto">Foto do comprovante:</label>
                     <input type="file" accept="image/*" capture="environment" id="inputFoto" multiple>
                 </div>
-                <button id="adicionarFotoBtn" class="btn-secondary">
-                    ➕ Adicionar à Lista
-                </button>
+                <button id="adicionarFotoBtn" class="btn-secondary">➕ Adicionar</button>
             </div>
 
             <!-- Pré-visualização -->
@@ -82,10 +80,7 @@
 
             <!-- Botões de Ação -->
             <div class="action-buttons">
-                <button id="enviarOneDriveBtn" class="btn-primary">
-                    ☁️ Enviar para o OneDrive
-                </button>
-                
+                <button id="enviarOneDriveBtn" class="btn-primary">☁️ Enviar para OneDrive</button>
                 <div class="export-buttons">
                     <button id="btnExportExcel" class="btn-secondary">Exportar Excel</button>
                     <button id="btnExportPDF" class="btn-secondary">Exportar PDF</button>
