@@ -193,8 +193,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const clientId = 'SEU_CLIENT_ID_AQUI'; // ← Substitua pelo seu
-        const redirectUri = 'https://seusite.netlify.app'; // ← Seu domínio
+        const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // ← Substitua pelo seu
+        const redirectUri = 'https://meuappcontas.netlify.app'; // ← Seu domínio
         const authUrl = `https://login.live.com/oauth20_authorize.srf?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
         const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
