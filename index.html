@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -25,12 +25,22 @@
                     <input type="date" id="dataFim" required>
                 </div>
             </div>
+            <div class="input-group">
+                <label for="valorDisponivel">Valor Disponível para Gastos (R$):</label>
+                <input type="number" id="valorDisponivel" step="0.01" min="0" placeholder="0,00" required>
+            </div>
             <button type="submit" class="btn-primary">▶️ Iniciar Registro</button>
         </form>
 
         <!-- Área de Registro de Gastos -->
         <div id="areaFotos" style="display:none;">
-            <h2>📷 Registrar Comprovantes</h2>
+            <div class="header-actions">
+                <h2>📷 Registrar Comprovantes</h2>
+                <button id="btnVoltar" class="btn-outline">↩️ Voltar</button>
+            </div>
+            
+            <div id="saldoInfo" class="saldo-container"></div>
+            
             <div class="upload-controls">
                 <div class="input-group">
                     <label for="dataRegistro">Data do Gasto:</label>
@@ -70,10 +80,17 @@
                 <p class="total-geral"><strong>Total Geral: <span id="totalGeral">R$ 0,00</span></strong></p>
             </div>
 
-            <!-- Controles Finais -->
-            <button id="enviarOneDriveBtn" class="btn-primary">
-                ☁️ Enviar para o OneDrive
-            </button>
+            <!-- Botões de Ação -->
+            <div class="action-buttons">
+                <button id="enviarOneDriveBtn" class="btn-primary">
+                    ☁️ Enviar para o OneDrive
+                </button>
+                
+                <div class="export-buttons">
+                    <button id="btnExportExcel" class="btn-secondary">Exportar Excel</button>
+                    <button id="btnExportPDF" class="btn-secondary">Exportar PDF</button>
+                </div>
+            </div>
         </div>
     </div>
     <script src="script.js"></script>
