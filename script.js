@@ -1,25 +1,31 @@
-// script.js completo corrigido
 let fotos = [];
 let dadosUsuario = {};
 let valorDisponivel = 0;
-let pastaIdOneDrive = null; // Armazena o ID da pasta única do período
+let pastaId = null;
 
 // =============== FUNÇÕES AUXILIARES ===============
 function formatarData(dataISO) {
+    if (!dataISO) return '';
     const [ano, mes, dia] = dataISO.split('-');
     return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${ano}`;
 }
 
 function formatarMoeda(valor) {
-    return new Intl.NumberFormat('pt-BR', { 
-        style: 'currency', 
-        currency: 'BRL' 
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
     }).format(valor || 0);
 }
 
 function atualizarTotais() {
-    let totais = { cafe: 0, almoco: 0, jantar: 0, lavanderia: 0, geral: 0 };
-    
+    let totais = {
+        cafe: 0,
+        almoco: 0,
+        jantar: 0,
+        lavanderia: 0,
+        geral: 0
+    };
+
     fotos.forEach(foto => {
         const valor = parseFloat(foto.valor);
         switch(foto.categoria) {
@@ -31,77 +37,100 @@ function atualizarTotais() {
         totais.geral += valor;
     });
 
-    // Atualiza interface
     document.getElementById('totalCafe').textContent = formatarMoeda(totais.cafe);
     document.getElementById('totalAlmoco').textContent = formatarMoeda(totais.almoco);
     document.getElementById('totalJanta').textContent = formatarMoeda(totais.jantar);
     document.getElementById('totalLavanderia').textContent = formatarMoeda(totais.lavanderia);
     document.getElementById('totalGeral').textContent = formatarMoeda(totais.geral);
 
-    // Atualiza saldo
     const saldoRestante = Math.max(0, valorDisponivel - totais.geral);
-    document.getElementById('saldoDisponivel').textContent = formatarMoeda(saldoRestante);
+    atualizarSaldoDisponivel(saldoRestante);
 }
 
 function atualizarPreview() {
     const container = document.getElementById('listaFotos');
     container.innerHTML = '';
 
-    // Mostra apenas fotos não enviadas
-    fotos.filter(foto => foto.arquivo).forEach(foto => {
-        const div = document.createElement('div');
-        div.className = 'photo-preview';
-        div.innerHTML = `
-            <img src="${foto.preview}" alt="Comprovante">
-            <div class="photo-info">
-                ${foto.categoria} - ${formatarData(foto.data)}<br>
-                ${formatarMoeda(foto.valor)}
-            </div>
-        `;
-        container.appendChild(div);
+    fotos.forEach(foto => {
+        // Só mostra fotos que ainda têm arquivo (não enviadas)
+        if (foto.arquivo) {
+            const div = document.createElement('div');
+            div.className = 'photo-preview';
+            div.innerHTML = `
+                <img src="${foto.preview}" alt="Comprovante">
+                <div class="photo-info">
+                    ${foto.categoria}<br>
+                    ${formatarData(foto.data)}<br>
+                    ${formatarMoeda(foto.valor)}
+                </div>
+            `;
+            container.appendChild(div);
+        }
     });
 }
 
+function atualizarSaldoDisponivel(valor) {
+    const saldoInfo = document.getElementById('saldoInfo');
+    saldoInfo.innerHTML = `Saldo disponível: ${formatarMoeda(valor)}`;
+    
+    if (valor <= valorDisponivel * 0.2) {
+        saldoInfo.style.backgroundColor = '#ffebee';
+        saldoInfo.style.color = '#c62828';
+    } else if (valor <= valorDisponivel * 0.5) {
+        saldoInfo.style.backgroundColor = '#fff8e1';
+        saldoInfo.style.color = '#ff8f00';
+    } else {
+        saldoInfo.style.backgroundColor = '#e8f5e9';
+        saldoInfo.style.color = '#388e3c';
+    }
+}
+
 // =============== PERSISTÊNCIA LOCAL ===============
-function salvarEstadoLocal() {
-    localStorage.setItem('viagemAtual', JSON.stringify({
+function salvarDadosLocalStorage() {
+    const estado = {
         dadosUsuario,
         valorDisponivel,
         fotos: fotos.map(f => ({
             ...f,
-            arquivo: null, // Não salvar arquivo binário
+            arquivo: null, // Não salvar arquivo no localStorage
             preview: ''    // Reduz tamanho do localStorage
         }))
-    }));
+    };
+    localStorage.setItem('viagemAtual', JSON.stringify(estado));
 }
 
-function carregarEstadoLocal() {
+function carregarDadosLocalStorage() {
     const saved = localStorage.getItem('viagemAtual');
     if (saved) {
-        const estado = JSON.parse(saved);
-        dadosUsuario = estado.dadosUsuario;
-        valorDisponivel = estado.valorDisponivel;
-        fotos = estado.fotos;
+        const { dadosUsuario: dados, valorDisponivel: valor, fotos: savedFotos } = JSON.parse(saved);
+        dadosUsuario = dados;
+        valorDisponivel = valor;
+        fotos = savedFotos;
         
         document.getElementById('formIdentificacao').style.display = 'none';
         document.getElementById('areaFotos').style.display = 'block';
+        atualizarSaldoDisponivel(valorDisponivel);
         atualizarPreview();
         atualizarTotais();
     }
 }
 
-// =============== ONEDRIVE (CORREÇÕES IMPLEMENTADAS) ===============
-async function criarOuObterPasta(accessToken) {
-    const nomePasta = `${dadosUsuario.nome}_${formatarData(dadosUsuario.dataInicio).replace(/\//g, '-')}`;
+// =============== ONEDRIVE ===============
+async function criarOuObterPastaUnica(accessToken) {
+    // Nome único por período
+    const pastaNome = `${dadosUsuario.nome}_${formatarData(dadosUsuario.dataInicio).replace(/\//g, '-')}`;
     
     // Verifica se a pasta já existe
-    let response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${nomePasta}`, {
+    let response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${pastaNome}`, {
         headers: { 'Authorization': `Bearer ${accessToken}` }
     });
     
-    if (response.status === 200) return await response.json();
+    if (response.status === 200) {
+        // Usa a pasta já existente
+        return await response.json();
+    }
     
-    // Cria nova pasta se não existir
+    // Se não existir, cria nova pasta
     response = await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children', {
         method: 'POST',
         headers: {
@@ -109,7 +138,7 @@ async function criarOuObterPasta(accessToken) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            name: nomePasta,
+            name: pastaNome,
             folder: {},
             "@microsoft.graph.conflictBehavior": "rename"
         })
@@ -120,39 +149,28 @@ async function criarOuObterPasta(accessToken) {
 
 // =============== EVENTOS PRINCIPAIS ===============
 document.addEventListener('DOMContentLoaded', () => {
-    carregarEstadoLocal();
+    carregarDadosLocalStorage();
 
-    // Formulário inicial
     document.getElementById('formIdentificacao').addEventListener('submit', function(e) {
         e.preventDefault();
         
-        // Reseta pasta ao mudar período
-        const novoInicio = document.getElementById('dataInicio').value;
-        const novoFim = document.getElementById('dataFim').value;
-        if (dadosUsuario.dataInicio !== novoInicio || dadosUsuario.dataFim !== novoFim) {
-            pastaIdOneDrive = null;
-        }
-
         dadosUsuario = {
             nome: this.nome.value.trim(),
-            dataInicio: novoInicio,
-            dataFim: novoFim
+            dataInicio: this.dataInicio.value,
+            dataFim: this.dataFim.value
         };
+        
         valorDisponivel = parseFloat(this.valorDisponivel.value) || 0;
-
-        // Configura datas
-        const dataRegistro = document.getElementById('dataRegistro');
-        dataRegistro.min = dadosUsuario.dataInicio;
-        dataRegistro.max = dadosUsuario.dataFim;
-        dataRegistro.value = new Date().toISOString().split('T')[0];
-
-        // Atualiza interface
-        this.style.display = 'none';
+        
+        document.getElementById('dataRegistro').min = dadosUsuario.dataInicio;
+        document.getElementById('dataRegistro').max = dadosUsuario.dataFim;
+        document.getElementById('dataRegistro').value = new Date().toISOString().split('T')[0];
+        
+        document.getElementById('formIdentificacao').style.display = 'none';
         document.getElementById('areaFotos').style.display = 'block';
-        salvarEstadoLocal();
+        salvarDadosLocalStorage();
     });
 
-    // Adicionar foto
     document.getElementById('adicionarFotoBtn').addEventListener('click', () => {
         const files = document.getElementById('inputFoto').files;
         const valor = document.getElementById('valorGasto').value;
@@ -176,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 atualizarPreview();
                 atualizarTotais();
-                salvarEstadoLocal();
+                salvarDadosLocalStorage();
             };
             reader.readAsDataURL(file);
         });
@@ -185,7 +203,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('valorGasto').value = '';
     });
 
-    // Enviar para OneDrive
     document.getElementById('enviarOneDriveBtn').addEventListener('click', async () => {
         const fotosParaEnviar = fotos.filter(f => f.arquivo);
         if (fotosParaEnviar.length === 0) {
@@ -193,50 +210,47 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // ← Substitua pelo seu
-        const redirectUri = 'https://meuappcontas.netlify.app'; // ← Seu domínio
-        const authUrl = `https://login.live.com/oauth20_authorize.srf?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
-
-        const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
+        const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // Seu Client ID
+        const redirectUri = 'https://meuappcontas.netlify.app'; // Seu domínio
         
-        window.addEventListener('message', async (e) => {
+        const authUrl = `https://login.live.com/oauth20_authorize.srf?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
+        const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
+
+        window.addEventListener('message', async function handler(e) {
             if (e.origin === window.location.origin && e.data.access_token) {
+                window.removeEventListener('message', handler);
                 try {
                     const accessToken = e.data.access_token;
                     
-                    // 1. Criar/obter pasta única
-                    const pasta = await criarOuObterPasta(accessToken);
-                    
-                    // 2. Enviar arquivos
+                    // CORREÇÃO 1: Criar/obter pasta ÚNICA para o período
+                    const pasta = await criarOuObterPastaUnica(accessToken);
+                    pastaId = pasta.id;
+
+                    // Upload dos arquivos para a pasta
                     for (const foto of fotosParaEnviar) {
-                        await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${pasta.id}:/${foto.nomeArquivo}:/content`, {
+                        await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${pastaId}:/${foto.nomeArquivo}:/content`, {
                             method: 'PUT',
                             headers: { 'Authorization': `Bearer ${accessToken}` },
                             body: foto.arquivo
                         });
                     }
+
+                    // CORREÇÃO 2: Remove apenas os arquivos (mantém dados)
+                    fotos = fotos.map(f => f.arquivo ? { ...f, arquivo: null, preview: '' } : f);
                     
-                    // 3. Remove apenas os arquivos (mantém dados)
-                    fotos = fotos.map(f => ({ 
-                        ...f, 
-                        arquivo: null,
-                        preview: ''
-                    }));
-                    
-                    salvarEstadoLocal();
+                    salvarDadosLocalStorage();
                     atualizarPreview();
-                    alert('Arquivos enviados para a pasta única do período!');
-                    window.open(pasta.webUrl, '_blank');
+                    alert('Arquivos enviados com sucesso!');
+                    window.open('https://onedrive.live.com/', '_blank');
+                    authWindow.close();
                 } catch (error) {
-                    alert('Erro: ' + error.message);
-                } finally {
+                    alert('Erro ao salvar: ' + error.message);
                     authWindow.close();
                 }
             }
         });
     });
 
-    // Exportação (mantido original)
     document.getElementById('btnExportExcel').addEventListener('click', () => {
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(fotos.map(f => ({
@@ -257,7 +271,6 @@ document.addEventListener('DOMContentLoaded', () => {
         doc.save('gastos.pdf');
     });
 
-    // Botão Voltar
     document.getElementById('btnVoltar').addEventListener('click', () => {
         document.getElementById('areaFotos').style.display = 'none';
         document.getElementById('formIdentificacao').style.display = 'block';
