@@ -126,6 +126,21 @@ input:focus, select:focus {
     background: #388e3c;
 }
 
+.btn-outline {
+    background: transparent;
+    color: #1e88e5;
+    padding: 8px 16px;
+    border: 2px solid #1e88e5;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-outline:hover {
+    background: #e3f2fd;
+}
+
 .totais-container {
     background: #e3f2fd;
     padding: 20px;
@@ -146,7 +161,40 @@ input:focus, select:focus {
     font-size: 18px;
 }
 
-/* Estilo para a nova categoria */
+.saldo-container {
+    background: #e8f5e9;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #388e3c;
+    text-align: center;
+}
+
+.header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.header-actions h2 {
+    margin-bottom: 0;
+}
+
+.export-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.action-buttons {
+    margin-top: 30px;
+}
+
+/* Estilo para a categoria Lavanderia */
 option[value="Lavanderia"] {
     background: #e8f5e9;
     color: #2e7d32;
