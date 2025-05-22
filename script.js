@@ -1,8 +1,7 @@
 let fotos = [];
 let dadosUsuario = {};
 let valorDisponivel = 0;
-let pastaId = null; // ID da pasta da viagem no OneDrive
-let accessToken = null; // Token de autenticação do OneDrive
+let pastaId = null;
 
 // =============== FUNÇÕES AUXILIARES ===============
 function formatarData(dataISO) {
@@ -44,7 +43,9 @@ function atualizarTotais() {
     document.getElementById('totalLavanderia').textContent = formatarMoeda(totais.lavanderia);
     document.getElementById('totalGeral').textContent = formatarMoeda(totais.geral);
 
-    atualizarSaldoDisponivel(valorDisponivel - totais.geral);
+    // Calcula o saldo disponível (não pode ser negativo)
+    const saldoRestante = Math.max(0, valorDisponivel - totais.geral);
+    atualizarSaldoDisponivel(saldoRestante);
 }
 
 function atualizarPreview() {
@@ -66,16 +67,15 @@ function atualizarPreview() {
     });
 }
 
-function atualizarSaldoDisponivel(valorRestante) {
-    const saldoAtual = Math.max(0, valorRestante);
+function atualizarSaldoDisponivel(valor) {
     const saldoInfo = document.getElementById('saldoInfo');
-    saldoInfo.innerHTML = `Saldo disponível: ${formatarMoeda(saldoAtual)}`;
+    saldoInfo.innerHTML = `Saldo disponível: ${formatarMoeda(valor)}`;
     
     // Muda a cor conforme o saldo diminui
-    if (saldoAtual <= valorDisponivel * 0.2) {
+    if (valor <= valorDisponivel * 0.2) {
         saldoInfo.style.backgroundColor = '#ffebee'; // Vermelho claro
         saldoInfo.style.color = '#c62828';
-    } else if (saldoAtual <= valorDisponivel * 0.5) {
+    } else if (valor <= valorDisponivel * 0.5) {
         saldoInfo.style.backgroundColor = '#fff8e1'; // Amarelo claro
         saldoInfo.style.color = '#ff8f00';
     } else {
@@ -84,44 +84,8 @@ function atualizarSaldoDisponivel(valorRestante) {
     }
 }
 
-// =============== PERSISTÊNCIA DE DADOS ===============
-function salvarDadosLocalStorage() {
-    const dadosSalvos = {
-        dadosUsuario,
-        valorDisponivel,
-        fotos: fotos.map(f => {
-            // Não armazenamos fotos completas no localStorage (ficaria muito grande)
-            // mas guardamos os dados para reconstruir fotos salvas no OneDrive
-            return {
-                categoria: f.categoria,
-                data: f.data,
-                valor: f.valor,
-                nomeArquivo: f.nomeArquivo
-            };
-        })
-    };
-    
-    localStorage.setItem('viagemAtual', JSON.stringify(dadosSalvos));
-}
-
-function carregarDadosLocalStorage() {
-    const dadosSalvos = localStorage.getItem('viagemAtual');
-    if (dadosSalvos) {
-        const dados = JSON.parse(dadosSalvos);
-        dadosUsuario = dados.dadosUsuario;
-        valorDisponivel = dados.valorDisponivel;
-        
-        // Carregamos apenas os metadados das fotos, sem as imagens
-        fotos = dados.fotos;
-        
-        return true;
-    }
-    return false;
-}
-
 // =============== EXPORTAÇÃO ===============
 function exportarParaExcel() {
-    const { jspdf: { jsPDF } } = window.jspdf;
     const wb = XLSX.utils.book_new();
     
     // Dados do cabeçalho
@@ -245,250 +209,129 @@ function exportarParaPDF() {
     doc.save(`gastos_viagem_${dadosUsuario.nome}.pdf`);
 }
 
-// =============== HISTÓRICO NO ONEDRIVE ===============
-async function salvarHistoricoOneDrive(accessToken) {
-    // Nome da pasta no formato desejado: Nome_DD-MM-AAAA
-    const pastaNome = `${dadosUsuario.nome}_${formatarData(dadosUsuario.dataInicio).replace(/\//g, '-')}`;
-    
-    try {
-        // PASSO 1: Criar ou obter pasta
-        let folderResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root/children?$filter=name eq '${pastaNome}' and folder ne null`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        let folderData = await folderResponse.json();
-        
-        // Se a pasta não existe, cria
-        if (!folderData.value || folderData.value.length === 0) {
-            const folderPayload = {
-                "name": pastaNome,
-                "folder": {},
-                "@microsoft.graph.conflictBehavior": "rename"
-            };
-            
-            folderResponse = await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(folderPayload)
-            });
-            
-            if (!folderResponse.ok) {
-                throw new Error(`Erro ao criar pasta: ${folderResponse.status}`);
-            }
-            
-            folderData = await folderResponse.json();
-            pastaId = folderData.id;
-        } else {
-            pastaId = folderData.value[0].id;
-        }
-        
-        // PASSO 2: Salvar arquivo de histórico
-        const historico = {
-            dadosUsuario,
-            valorDisponivel,
-            fotos: fotos.map(f => ({
-                categoria: f.categoria,
-                data: f.data,
-                valor: f.valor,
-                nomeArquivo: f.nomeArquivo
-            }))
-        };
-        
-        const historicoBlob = new Blob([JSON.stringify(historico)], { type: 'application/json' });
-        const historicoResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${pastaId}:/historico.json:/content`, {
-            method: 'PUT',
-            headers: { 'Authorization': `Bearer ${accessToken}` },
-            body: historicoBlob
-        });
-        
-        if (!historicoResponse.ok) {
-            throw new Error('Erro ao salvar histórico');
-        }
-        
-        return pastaId;
-    } catch (error) {
-        console.error('Erro ao salvar histórico:', error);
-        throw error;
-    }
-}
-
-async function carregarHistoricoOneDrive(accessToken) {
-    // Nome da pasta no formato: Nome_DD-MM-AAAA
-    const pastaNome = `${dadosUsuario.nome}_${formatarData(dadosUsuario.dataInicio).replace(/\//g, '-')}`;
-    
-    try {
-        // PASSO 1: Encontrar pasta
-        const folderResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root/children?$filter=name eq '${pastaNome}' and folder ne null`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        
-        if (!folderResponse.ok) {
-            throw new Error('Erro ao buscar pasta');
-        }
-        
-        const folderData = await folderResponse.json();
-        if (!folderData.value || folderData.value.length === 0) {
-            return null; // Pasta não encontrada
-        }
-        
-        pastaId = folderData.value[0].id;
-        
-        // PASSO 2: Carregar arquivo de histórico
-        const historicoResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${pastaId}:/historico.json:/content`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        
-        if (!historicoResponse.ok) {
-            if (historicoResponse.status === 404) return null;
-            throw new Error('Erro ao carregar histórico');
-        }
-        
-        return await historicoResponse.json();
-    } catch (error) {
-        console.error('Erro ao carregar histórico:', error);
-        return null;
-    }
-}
-
-// =============== EVENTOS PRINCIPAIS ===============
+// =============== INICIALIZAÇÃO ===============
 document.addEventListener('DOMContentLoaded', () => {
     // Inicializa botões de exportação
     document.getElementById('btnExportExcel').addEventListener('click', exportarParaExcel);
     document.getElementById('btnExportPDF').addEventListener('click', exportarParaPDF);
     
-    // Verifica se há dados salvos localmente
-    if (carregarDadosLocalStorage()) {
-        // Já temos dados, mostra a tela de gastos diretamente
-        document.getElementById('formIdentificacao').style.display = 'none';
-        document.getElementById('areaFotos').style.display = 'block';
-        
-        // Configura campos com os dados salvos
-        const dataRegistro = document.getElementById('dataRegistro');
-        dataRegistro.min = dadosUsuario.dataInicio;
-        dataRegistro.max = dadosUsuario.dataFim;
-        dataRegistro.value = new Date().toISOString().split('T')[0];
-        
-        // Atualiza interface
-        atualizarSaldoDisponivel(valorDisponivel);
-        atualizarPreview();
-        atualizarTotais();
-    }
-});
-
-// Formulário de identificação
-document.getElementById('formIdentificacao').addEventListener('submit', function(e) {
-    e.preventDefault();
-
-    dadosUsuario = {
-        nome: document.getElementById('nome').value.trim(),
-        dataInicio: document.getElementById('dataInicio').value,
-        dataFim: document.getElementById('dataFim').value
-    };
-
-    // Captura o valor disponível
-    valorDisponivel = parseFloat(document.getElementById('valorDisponivel').value) || 0;
-
-    // Configurar datas
-    const dataRegistro = document.getElementById('dataRegistro');
-    dataRegistro.min = dadosUsuario.dataInicio;
-    dataRegistro.max = dadosUsuario.dataFim;
-    dataRegistro.value = new Date().toISOString().split('T')[0];
-
-    // Salva no localStorage para persistência
-    salvarDadosLocalStorage();
-
-    // Mostra a tela de gastos
-    document.getElementById('formIdentificacao').style.display = 'none';
-    document.getElementById('areaFotos').style.display = 'block';
+    // Botão Voltar
+    document.getElementById('btnVoltar').addEventListener('click', () => {
+        document.getElementById('areaFotos').style.display = 'none';
+        document.getElementById('formIdentificacao').style.display = 'block';
+        document.getElementById('nome').value = dadosUsuario.nome || '';
+        document.getElementById('dataInicio').value = dadosUsuario.dataInicio || '';
+        document.getElementById('dataFim').value = dadosUsuario.dataFim || '';
+        document.getElementById('valorDisponivel').value = valorDisponivel || '';
+    });
     
-    // Atualiza saldo
-    atualizarSaldoDisponivel(valorDisponivel);
-});
+    // Botão Adicionar Foto
+    document.getElementById('adicionarFotoBtn').addEventListener('click', () => {
+        const files = document.getElementById('inputFoto').files;
+        const valor = document.getElementById('valorGasto').value;
+        const data = document.getElementById('dataRegistro').value;
 
-// Botão Voltar
-document.getElementById('btnVoltar').addEventListener('click', function() {
-    // Salva dados atuais
-    salvarDadosLocalStorage();
-    
-    // Volta para a tela inicial
-    document.getElementById('areaFotos').style.display = 'none';
-    document.getElementById('formIdentificacao').style.display = 'block';
-    
-    // Preenche os campos com os valores atuais
-    document.getElementById('nome').value = dadosUsuario.nome || '';
-    document.getElementById('dataInicio').value = dadosUsuario.dataInicio || '';
-    document.getElementById('dataFim').value = dadosUsuario.dataFim || '';
-    document.getElementById('valorDisponivel').value = valorDisponivel || '';
-});
+        if (!data || !valor || files.length === 0) {
+            alert('Preencha todos os campos!');
+            return;
+        }
 
-// Adicionar foto
-document.getElementById('adicionarFotoBtn').addEventListener('click', function() {
-    const files = document.getElementById('inputFoto').files;
-    const valor = document.getElementById('valorGasto').value;
-    const data = document.getElementById('dataRegistro').value;
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = e => {
+                fotos.push({
+                    arquivo: file,
+                    preview: e.target.result,
+                    categoria: document.getElementById('legenda').value,
+                    data: data,
+                    valor: valor,
+                    enviado: false, // Marca como não enviado
+                    nomeArquivo: `${dadosUsuario.nome.replace(/ /g, '_')}_${formatarData(data).replace(/\//g, '-')}_${Date.now()}.${file.name.split('.').pop()}`
+                });
+                atualizarPreview();
+                atualizarTotais();
+            };
+            reader.readAsDataURL(file);
+        });
 
-    if (!data || !valor || files.length === 0) {
-        alert('Preencha todos os campos!');
-        return;
-    }
-
-    Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = e => {
-            fotos.push({
-                arquivo: file,
-                preview: e.target.result,
-                categoria: document.getElementById('legenda').value,
-                data: data,
-                valor: valor,
-                nomeArquivo: `${dadosUsuario.nome.replace(/ /g, '_')}_${formatarData(data).replace(/\//g, '-')}_${Date.now()}.${file.name.split('.').pop()}`
-            });
-            atualizarPreview();
-            atualizarTotais();
-            salvarDadosLocalStorage(); // Salva após cada adição
-        };
-        reader.readAsDataURL(file);
+        document.getElementById('inputFoto').value = '';
+        document.getElementById('valorGasto').value = '';
     });
 
-    document.getElementById('inputFoto').value = '';
-    document.getElementById('valorGasto').value = '';
-});
+    // Botão Enviar para OneDrive
+    document.getElementById('enviarOneDriveBtn').addEventListener('click', async () => {
+        if (fotos.length === 0) {
+            alert('Adicione comprovantes primeiro!');
+            return;
+        }
+        
+        // Verifica se há fotos não enviadas
+        const fotosParaEnviar = fotos.filter(foto => !foto.enviado && foto.arquivo);
+        
+        if (fotosParaEnviar.length === 0) {
+            alert('Não há novos comprovantes para enviar!');
+            return;
+        }
 
-// =============== INTEGRAÇÃO ONEDRIVE ===============
-document.getElementById('enviarOneDriveBtn').addEventListener('click', async () => {
-    if (fotos.length === 0) {
-        alert('Adicione comprovantes primeiro!');
-        return;
-    }
+        const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // Substitua pelo seu Client ID do Azure
+        const redirectUri = 'https://meuappcontas.netlify.app'; // Substitua pelo seu domínio exato
 
-    const clientId = '48afd123-9f72-4019-b2a1-5ccfe1d29121'; // Substitua pelo seu Client ID do Azure
-    const redirectUri = 'https://meuappcontas.netlify.app'; // Substitua pelo seu domínio exato
+        const authUrl = `https://login.live.com/oauth20_authorize.srf?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-    const authUrl = `https://login.live.com/oauth20_authorize.srf?client_id=${clientId}&scope=Files.ReadWrite&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
+        // Abre janela de autenticação
+        const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
+        if (!authWindow) {
+            alert('Pop-up bloqueado! Permita pop-ups para este site.');
+            return;
+        }
 
-    // Abre janela de autenticação
-    const authWindow = window.open(authUrl, 'auth', 'width=600,height=800');
-    if (!authWindow) {
-        alert('Pop-up bloqueado! Permita pop-ups para este site.');
-        return;
-    }
+        window.addEventListener('message', async function handler(e) {
+            if (e.origin === window.location.origin && e.data.access_token) {
+                window.removeEventListener('message', handler);
+                const accessToken = e.data.access_token;
 
-    window.addEventListener('message', async function handler(e) {
-        if (e.origin === window.location.origin && e.data.access_token) {
-            window.removeEventListener('message', handler);
-            accessToken = e.data.access_token;
+                try {
+                    // Nome ÚNICO da pasta para este período (sem números sequenciais)
+                    const pastaNome = `${dadosUsuario.nome.replace(/ /g, '_')}_${formatarData(dadosUsuario.dataInicio).replace(/\//g, '-')}`;
 
-            try {
-                // Salva histórico primeiro (cria pasta se necessário)
-                await salvarHistoricoOneDrive(accessToken);
-                
-                // Upload dos arquivos para a pasta
-                let uploadedCount = 0;
-                for (const foto of fotos) {
-                    // Só faz upload de fotos que tenham o arquivo disponível
-                    if (foto.arquivo) {
+                    // PASSO 1: Verificar se a pasta já existe
+                    let folderResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root/children?$filter=name eq '${pastaNome}' and folder ne null`, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    
+                    let folderResult = await folderResponse.json();
+                    
+                    // Se a pasta não existir, cria uma nova
+                    if (!folderResult.value || folderResult.value.length === 0) {
+                        const folderData = {
+                            "name": pastaNome,
+                            "folder": {},
+                            "@microsoft.graph.conflictBehavior": "fail" // Não cria duplicatas
+                        };
+                        
+                        folderResponse = await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(folderData)
+                        });
+                        
+                        if (!folderResponse.ok) {
+                            throw new Error(`Erro ao criar pasta: ${folderResponse.status}`);
+                        }
+                        
+                        folderResult = await folderResponse.json();
+                        pastaId = folderResult.id;
+                    } else {
+                        // Usa a pasta existente
+                        pastaId = folderResult.value[0].id;
+                    }
+                    
+                    // PASSO 2: Upload dos arquivos não enviados
+                    let uploadedCount = 0;
+                    for (const foto of fotosParaEnviar) {
                         const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${pastaId}:/${foto.nomeArquivo}:/content`, {
                             method: 'PUT',
                             headers: { 'Authorization': `Bearer ${accessToken}` },
@@ -497,30 +340,67 @@ document.getElementById('enviarOneDriveBtn').addEventListener('click', async () 
 
                         if (response.ok) {
                             uploadedCount++;
+                            foto.enviado = true; // Marca como enviado
                         } else {
                             console.error(`Erro ao enviar ${foto.nomeArquivo}: ${response.status}`);
                         }
                     }
-                }
 
-                // Fecha a janela de autenticação e atualiza status
-                authWindow.close();
-                
-                if (uploadedCount > 0) {
-                    alert(`${uploadedCount} comprovantes salvos com sucesso!`);
-                    // Não limpa as fotos, pois queremos manter o histórico
-                } else {
-                    alert('Dados salvos, mas não havia novos comprovantes para enviar.');
+                    authWindow.close();
+                    
+                    if (uploadedCount > 0) {
+                        alert(`${uploadedCount} comprovantes salvos com sucesso!`);
+                        
+                        // Remove fotos enviadas do array e atualiza a interface
+                        fotos = fotos.filter(foto => !foto.enviado);
+                        atualizarPreview();
+                        atualizarTotais();
+                        
+                        // Abre o OneDrive para visualização
+                        window.open('https://onedrive.live.com/', '_blank');
+                    } else {
+                        alert('Nenhum comprovante foi salvo. Verifique se há espaço suficiente no OneDrive.');
+                    }
+                } catch (error) {
+                    alert('Erro ao salvar arquivos: ' + error.message);
+                    console.error('Erro completo:', error);
+                    authWindow.close();
                 }
-                
-                // Abre o OneDrive
-                window.open('https://onedrive.live.com/', '_blank');
-            } catch (error) {
-                alert('Erro ao salvar: ' + error.message);
-                console.error('Erro completo:', error);
-                authWindow.close();
             }
+        });
+    });
+    
+    // Formulário Inicial
+    document.getElementById('formIdentificacao').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Verifica se mudou o período - se sim, limpa as fotos
+        const novoInicio = document.getElementById('dataInicio').value;
+        const novoFim = document.getElementById('dataFim').value;
+        
+        if (dadosUsuario.dataInicio !== novoInicio || dadosUsuario.dataFim !== novoFim) {
+            fotos = []; // Limpa fotos ao mudar o período
+            pastaId = null; // Reseta o ID da pasta
         }
+
+        dadosUsuario = {
+            nome: document.getElementById('nome').value.trim(),
+            dataInicio: novoInicio,
+            dataFim: novoFim
+        };
+
+        valorDisponivel = parseFloat(document.getElementById('valorDisponivel').value) || 0;
+
+        const dataRegistro = document.getElementById('dataRegistro');
+        dataRegistro.min = dadosUsuario.dataInicio;
+        dataRegistro.max = dadosUsuario.dataFim;
+        dataRegistro.value = new Date().toISOString().split('T')[0];
+
+        document.getElementById('formIdentificacao').style.display = 'none';
+        document.getElementById('areaFotos').style.display = 'block';
+        
+        atualizarSaldoDisponivel(valorDisponivel);
+        atualizarPreview();
     });
 });
 
